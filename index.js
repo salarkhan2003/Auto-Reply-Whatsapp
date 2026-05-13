@@ -11,24 +11,11 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-// Find chromium executable path for Linux/Railway
-function getChromiumPath() {
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-    if (process.platform !== 'linux') return undefined;
-    const { execSync } = require('child_process');
-    const paths = ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'];
-    for (const p of paths) {
-        try { execSync(`test -f ${p}`); return p; } catch (e) {}
-    }
-    return undefined;
-}
-
 // Initialize WhatsApp Client
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         handleSIGINT: false,
-        executablePath: getChromiumPath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
