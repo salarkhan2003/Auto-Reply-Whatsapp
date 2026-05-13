@@ -1,34 +1,13 @@
 #!/bin/bash
 echo "[System] Starting WhatsApp Auto-Reply Bot..."
 
-# Install missing Chrome system dependencies at runtime
-echo "[System] Installing required system libraries..."
-apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    fonts-liberation \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxext6 \
-    libxi6 \
-    libxtst6 \
-    libxss1 \
-    2>/dev/null || echo "[Warning] Some libs may already be installed, continuing..."
+# Point Chrome to the libs we copied during build into /app/libs
+if [ -d "/app/libs" ]; then
+    LIB_COUNT=$(ls /app/libs/ 2>/dev/null | wc -l)
+    echo "[System] Found $LIB_COUNT bundled libs in /app/libs"
+    export LD_LIBRARY_PATH="/app/libs:$LD_LIBRARY_PATH"
+else
+    echo "[Warning] /app/libs not found - Chrome may fail to start"
+fi
 
-echo "[System] Libraries ready. Launching bot..."
 exec node index.js
