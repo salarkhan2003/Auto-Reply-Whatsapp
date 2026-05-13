@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["chromium"]
+nixPkgs = ["chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "glib", "nspr", "at-spi2-atk", "cups", "dbus", "libdrm", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "expat", "libxkbcommon", "mesa"]
 
 [phases.build]
 cmds = ["npm ci"]
 
 [start]
-cmd = "PUPPETEER_EXECUTABLE_PATH=$(which chromium) node index.js"
+cmd = "bash start.sh"
