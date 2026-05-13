@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const QRCodeWeb = require('qrcode');
 const Groq = require('groq-sdk');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
@@ -10,6 +11,9 @@ dotenv.config();
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
+
+let lastQr = null;
+let isReady = false;
 
 // Initialize WhatsApp Client
 const client = new Client({
@@ -34,12 +38,35 @@ const client = new Client({
 
 // Simple health check server for Railway/Render
 const http = require('http');
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot is running\n');
+const server = http.createServer(async (req, res) => {
+    if (isReady) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<h1>WhatsApp Bot is Running!</h1><p>Status: Connected</p>');
+        return;
+    }
+
+    if (lastQr) {
+        try {
+            const qrImage = await QRCodeWeb.toDataURL(lastQr);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(`
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
+                    <h1>Scan to Login</h1>
+                    <img src="${qrImage}" style="width: 300px; height: 300px; border: 10px solid white; box-shadow: 0 0 20px rgba(0,0,0,0.1);" />
+                    <p>Refresh the page if the QR code expires.</p>
+                </div>
+            `);
+        } catch (err) {
+            res.writeHead(500);
+            res.end('Error generating QR code');
+        }
+    } else {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<h1>Starting...</h1><p>Please wait a few seconds and refresh the page.</p>');
+    }
 });
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(chalk.green(`[System] Health check server listening on port ${PORT}`));
 });
 
@@ -91,11 +118,14 @@ You are replying on behalf of me (the user). Match my style based on the example
 
 // WhatsApp Events
 client.on('qr', (qr) => {
-    console.log(chalk.yellow('[WhatsApp] Scan this QR code to login:'));
+    lastQr = qr;
+    console.log(chalk.yellow('[WhatsApp] New QR code generated. Access it via your Railway URL.'));
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
+    isReady = true;
+    lastQr = null;
     console.log(chalk.green('[WhatsApp] Client is ready! Waiting for messages...'));
 });
 
