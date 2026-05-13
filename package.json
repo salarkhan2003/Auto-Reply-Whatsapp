@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "mkdir -p /app/libs && find /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /lib/x86_64-linux-gnu /nix/store -maxdepth 5 \( -name 'libglib-2.0*' -o -name 'libnss3*' -o -name 'libnssutil3*' -o -name 'libnspr4*' -o -name 'libatk-1.0*' -o -name 'libatk-bridge*' -o -name 'libcups*' -o -name 'libdrm*' -o -name 'libxkbcommon*' -o -name 'libgbm*' -o -name 'libpango*' -o -name 'libcairo*' -o -name 'libx11*' -o -name 'libxcb*' -o -name 'libxext*' -o -name 'libxfixes*' -o -name 'libxrandr*' -o -name 'libxcomposite*' -o -name 'libxdamage*' \) -type f 2>/dev/null | xargs -I{} cp -n {} /app/libs/ 2>/dev/null; echo \"[Build] Copied $(ls /app/libs/ | wc -l) libs to /app/libs\"",
+    "postinstall": "bash build-libs.sh",
     "start": "bash start.sh"
   },
   "keywords": [],
