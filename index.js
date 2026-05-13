@@ -21,7 +21,7 @@ const client = new Client({
     puppeteer: {
         handleSIGINT: false,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        protocolTimeout: 60000, // Increase timeout to 60 seconds
+        protocolTimeout: 90000, // Increase to 90 seconds
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -29,11 +29,15 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--mute-audio',
+            '--no-default-browser-check'
         ],
     },
-    authTimeoutMs: 60000, // Increase auth timeout
-    qrMaxRetries: 10 // Allow more retries for QR
+    authTimeoutMs: 90000, // Increase to 90 seconds
+    qrMaxRetries: 15
 });
 
 // Simple health check server for Railway/Render
