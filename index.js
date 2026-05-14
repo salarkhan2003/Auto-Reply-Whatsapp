@@ -7,9 +7,14 @@ const chalk = require('chalk');
 
 dotenv.config();
 
+// Check Environment Variables
+if (!process.env.GROQ_API_KEY) {
+    console.error(chalk.red('[Critical] GROQ_API_KEY is missing! Please add it to your Railway Variables.'));
+}
+
 // Initialize Groq
 const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY
+    apiKey: process.env.GROQ_API_KEY || 'MISSING'
 });
 
 let lastQr = null;
@@ -21,7 +26,7 @@ const client = new Client({
     puppeteer: {
         handleSIGINT: false,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        protocolTimeout: 90000, // Increase to 90 seconds
+        protocolTimeout: 0, // Disable timeout
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -33,19 +38,35 @@ const client = new Client({
             '--disable-extensions',
             '--disable-default-apps',
             '--mute-audio',
-            '--no-default-browser-check'
+            '--no-default-browser-check',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process'
         ],
     },
-    authTimeoutMs: 90000, // Increase to 90 seconds
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
+    },
+    authTimeoutMs: 0, // Disable timeout
     qrMaxRetries: 15
 });
 
 // Simple health check server for Railway/Render
 const http = require('http');
 const server = http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
     if (isReady) {
         res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<h1>WhatsApp Bot is Running!</h1><p>Status: Connected</p>');
+        res.end(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #075e54; color: white;">
+                <h1 style="font-size: 3rem;">✅ Bot is Online</h1>
+                <p style="font-size: 1.2rem;">Status: Connected and listening for messages.</p>
+                <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                    <p>API Key Status: ${process.env.GROQ_API_KEY ? 'Active' : '❌ MISSING'}</p>
+                </div>
+            </div>
+        `);
         return;
     }
 
@@ -54,10 +75,13 @@ const server = http.createServer(async (req, res) => {
             const qrImage = await QRCodeWeb.toDataURL(lastQr);
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(`
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-                    <h1>Scan to Login</h1>
-                    <img src="${qrImage}" style="width: 300px; height: 300px; border: 10px solid white; box-shadow: 0 0 20px rgba(0,0,0,0.1);" />
-                    <p>Refresh the page if the QR code expires.</p>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5;">
+                    <h1 style="color: #128c7e;">Scan to Login (Railway)</h1>
+                    <div style="background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                        <img src="${qrImage}" style="width: 300px; height: 300px;" />
+                    </div>
+                    <p style="margin-top: 20px; color: #667781;">Open WhatsApp > Linked Devices > Link a Device</p>
+                    <p style="font-size: 0.8rem; color: #999;">If the code expires, refresh this page.</p>
                 </div>
             `);
         } catch (err) {
@@ -66,7 +90,13 @@ const server = http.createServer(async (req, res) => {
         }
     } else {
         res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<h1>Starting...</h1><p>Please wait a few seconds and refresh the page.</p>');
+        res.end(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
+                <h1 style="color: #075e54;">Starting WhatsApp...</h1>
+                <p>Please wait while we initialize the browser (approx 30-60s).</p>
+                <p>Refresh this page in a moment to see the QR code.</p>
+            </div>
+        `);
     }
 });
 const PORT = process.env.PORT || 3000;
@@ -113,9 +143,17 @@ You are replying on behalf of me (the user). Match my style based on the example
             max_tokens: 150,
         });
 
-        return completion.choices[0].message.content;
+        const aiResponse = completion.choices[0]?.message?.content;
+        if (!aiResponse) {
+            console.log(chalk.yellow('[AI] Received empty response from Groq.'));
+            return null;
+        }
+        return aiResponse;
     } catch (error) {
-        console.error(chalk.red('[Error] Groq API Error:'), error.message);
+        console.error(chalk.red('[Error] Groq API Error:'), error);
+        if (error.message.includes('404')) {
+            console.log(chalk.yellow('[Tip] Model name might be incorrect. Try llama-3.1-70b-versatile or llama3-70b-8192'));
+        }
         return null;
     }
 }
@@ -133,27 +171,61 @@ client.on('ready', () => {
     console.log(chalk.green('[WhatsApp] Client is ready! Waiting for messages...'));
 });
 
-client.on('message', async (msg) => {
-    // Avoid replying to groups (optional, can be toggled)
-    const chat = await msg.getChat();
-    if (chat.isGroup) return;
-
-    // Avoid replying to status updates or system messages
-    if (msg.from === 'status@broadcast') return;
-
-    console.log(chalk.cyan(`[Message] From ${msg.from}: ${msg.body}`));
-
-    // Typing indicator
-    await chat.sendStateTyping();
-
-    // Get AI Response
-    const response = await getAIResponse(msg.body, chat.name);
-
-    if (response) {
-        await msg.reply(response);
-        console.log(chalk.magenta(`[Reply] Sent: ${response}`));
-    }
+client.on('auth_failure', (msg) => {
+    isReady = false;
+    console.error(chalk.red('[WhatsApp] Auth failure:'), msg);
 });
+
+client.on('disconnected', (reason) => {
+    isReady = false;
+    console.log(chalk.yellow('[WhatsApp] Client was logged out:'), reason);
+    client.initialize(); // Attempt to reconnect
+});
+
+// Handle Incoming Messages
+async function handleMessage(msg) {
+    try {
+        // Avoid replying to status updates or system messages
+        if (msg.from === 'status@broadcast' || msg.type === 'ciphertext') return;
+
+        const chat = await msg.getChat();
+        
+        // Avoid replying to groups (can be toggled)
+        if (chat.isGroup) {
+            // console.log(chalk.gray(`[Info] Skipping group message in ${chat.name}`));
+            return;
+        }
+
+        // Avoid replying to messages sent by the bot itself (to prevent loops)
+        if (msg.fromMe) return;
+
+        console.log(chalk.cyan(`[Message] From ${chat.name || msg.from}: ${msg.body}`));
+
+        // Typing indicator
+        await chat.sendStateTyping();
+
+        // Get AI Response
+        const response = await getAIResponse(msg.body, chat.name || "User");
+
+        if (response) {
+            await msg.reply(response);
+            console.log(chalk.magenta(`[Reply] Sent to ${chat.name || msg.from}: ${response}`));
+        } else {
+            console.log(chalk.yellow(`[Warning] No response generated for message from ${chat.name || msg.from}`));
+        }
+    } catch (error) {
+        console.error(chalk.red('[Error] Message handling failed:'), error);
+    }
+}
+
+client.on('message', handleMessage);
+
+// Optionally handle 'message_create' if you want to respond to your own messages for testing
+// client.on('message_create', (msg) => {
+//     if (msg.fromMe && msg.body === '!test') {
+//         handleMessage(msg);
+//     }
+// });
 
 // Start Client
 console.log(chalk.blue('[System] Starting WhatsApp Bot...'));
