@@ -60,7 +60,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #075e54; color: white;">
-                <h1 style="font-size: 3rem;">✅ Bot is Online</h1>
+                <h1 style="font-size: 3rem;">✅ Bot is Online (v1.2)</h1>
                 <p style="font-size: 1.2rem;">Status: Connected and listening for messages.</p>
                 <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
                     <p>API Key Status: ${process.env.GROQ_API_KEY ? 'Active' : '❌ MISSING'}</p>
@@ -228,5 +228,5 @@ client.on('message', handleMessage);
 // });
 
 // Start Client
-console.log(chalk.blue('[System] Starting WhatsApp Bot...'));
+console.log(chalk.blue('[System] Starting WhatsApp Bot v1.2 (Railway Optimized)...'));
 client.initialize();
