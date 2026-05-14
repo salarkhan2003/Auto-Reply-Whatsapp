@@ -18,6 +18,7 @@ const groq = new Groq({
 });
 
 let lastQr = null;
+let lastQrImage = null; // Cache for faster health checks
 let isReady = false;
 
 // Initialize WhatsApp Client
@@ -72,7 +73,10 @@ const server = http.createServer(async (req, res) => {
 
     if (lastQr) {
         try {
-            const qrImage = await QRCodeWeb.toDataURL(lastQr);
+            // Use cached image if available, otherwise generate it
+            const qrImage = lastQrImage || await QRCodeWeb.toDataURL(lastQr);
+            if (!lastQrImage) lastQrImage = qrImage;
+
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(`
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5;">
@@ -159,8 +163,13 @@ You are replying on behalf of me (the user). Match my style based on the example
 }
 
 // WhatsApp Events
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
     lastQr = qr;
+    try {
+        lastQrImage = await QRCodeWeb.toDataURL(qr); // Pre-cache the image
+    } catch (err) {
+        console.error(chalk.red('[Error] Failed to cache QR image:'), err);
+    }
     console.log(chalk.yellow('[WhatsApp] New QR code generated. Access it via your Railway URL.'));
     qrcode.generate(qr, { small: true });
 });
